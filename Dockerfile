@@ -1,12 +1,16 @@
-# Use the official lightweight Python image.
-FROM python:3.9-slim
-# Allow statements and log
-ENV PYTHONUNBUFFERED True
-# Copy local code to the container image.
-ENV APP_HOME /app
-WORKDIR $APP_HOME
+# build environment
+FROM node:18.12.0-alpine as react-build
+WORKDIR /app
 COPY . ./
-# Install production dependencies.
-RUN pip install -r requirements.txt
-# Run
-CMD exec gunicorn --bind :$PORT --workers 1 --worker-class uvicorn.workers.UvicornWorker  --threads 8 dbconnection:app
+RUN npm i
+RUN npm run build
+
+# server environment
+FROM nginx:alpine
+COPY nginx.conf /etc/nginx/conf.d/configfile.template
+ENV PORT 9011
+ENV HOST 0.0.0.0
+RUN sh -c "envsubst '\$PORT'  < /etc/nginx/conf.d/configfile.template > /etc/nginx/conf.d/default.conf"
+COPY --from=react-build /app/build /usr/share/nginx/html
+EXPOSE 9011
+CMD ["nginx", "-g", "daemon off;"]
